@@ -11,6 +11,7 @@ For a disassembler, see [https://gitee.com/openharmony/arkcompiler_runtime_core/
 - Parsing of `Value` of `any` type is not implemented. The `Value` struct is used when a `Field`, in its `field_data`, has a `TaggedValue` with the tag `VALUE` (bit of a tongue twister). `Value` follows a Tag-Value format too, whose tag is - surprise surprise - undocumented. Luckily, this time the code is simpler, except for the `0x0b` tag, which means the type of the value is `any`. I have no idea what this type means and how it should be interpreted.
 - Parsing of methods referred to by `MethodRegionIndex` is still problematic, so this part of code has been commented out.
 - Parsing of `DebugInfo`, `MethodHandle`, and `Annotation`-related structs is not implemented yet.
+- Parsing of `LineNumberProgram` is flawed too, as the operands in a line number program are not handled at all, and as such a `0x0` operand would be misinterpreted as marking the end of the program.
 
 # References
 - [Official documentation for the .abc format](https://gitee.com/openharmony/arkcompiler_runtime_core/blob/master/docs/file_format.md) (Careful, a few things in it are not accurate or up-to-date)
