@@ -204,6 +204,15 @@ typedef struct {
     uchar element_types[count] <comment="Array of annotation element's types. Each element in the array describes the type of AnnotationElement. The order of elements in the array matches the order of elements field.">;
 } Annotation;
 
+typedef struct {
+    uleb128 line_start <comment="The initial value of line register of the state machine.">;
+    uleb128 num_parameters <comment="Number of method parameters.">;
+    uleb128 parameters[uleb128_value(num_parameters)] <optimize=false, comment="Parameters names of the method. The array has num_parameters elements. Each element is an offset to String or 0 if there is no name.">;
+    uleb128 constant_pool_size <comment="Size of constant pool in bytes.">;
+    uchar constant_pool[uleb128_value(constant_pool_size)] <comment="Constant pool data of length constant_pool_size bytes.">;
+    uleb128 line_number_program_idx <comment=" 	Line number program index in a LineNumberProgramIndex structure. The program has variable length and ends with DBG_END_SEQUENCE opcode.">;
+} DebugInfo;
+
 void readCodeAt(uint offset) {
     local int64 pos;
     local int color;
@@ -213,6 +222,20 @@ void readCodeAt(uint offset) {
         FSeek(offset);
         SetBackColor(cLtYellow);
         Code code_data <comment="Code data.">;
+        FSeek(pos);
+        SetBackColor(color);
+    }
+}
+
+void readDebugInfoAt(uint offset) {
+    local int64 pos;
+    local int color;
+    if (offset != 0) {
+        color = GetBackColor();
+        pos = FTell();
+        FSeek(offset);
+        SetBackColor(0xc0c0c0);
+        DebugInfo debug_info <comment="Debug information contains mapping between program counter of a method and line numbers in source code and information about local variables. The format is derived from DWARF Debugging Information Format, Version 3 (see item 6.2). The mapping and local variable information are encoded in line number program which is interpreted by the state machine. To deduplicate the same line number programs of different methods all constants the program refers to are moved into the constant pool.">;
         FSeek(pos);
         SetBackColor(color);
     }
@@ -348,6 +371,7 @@ typedef struct {
         break;
     case 5:  // DEBUG_INFO
         uint debug_info <comment="Data represents the offset to debug information related to the method. The offset must point to DebugInfo.">;
+        readDebugInfoAt(debug_info);
         break;
     case 6:  // ANNOTATIONS
         uint annotations <comment="Data represents the offset to runtime invisible annotation of the method. The tag may be repeated in case the method has several annotations. The offset must point to the value in Annotation format.">;
