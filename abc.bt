@@ -194,6 +194,7 @@ typedef struct {
 typedef struct {
     uint name_off <comment="Offset to the element's name. The offset must point to a String.">;
     readStringAt(name_off);
+    // size of value is fixed (32-bit), see `arkcompiler\runtime_core\libpandafile\annotation_data_accessor.cpp`
     uint value <comment="Value of the element. If the annotation element has type boolean, byte, short, char, int or float the field value contains the value itself in the corresponding Value format. Else the field contains offset to a Value. Format of the value could be determined based on element's type.">;
 } AnnotationElement;
 
@@ -203,6 +204,16 @@ typedef struct {
     AnnotationElement elements[count] <comment="Array of annotation elements. Each element is in AnnotationElement format. Order of elements must be the same as they follow in the annotation class.">;
     uchar element_types[count] <comment="Array of annotation element's types. Each element in the array describes the type of AnnotationElement. The order of elements in the array matches the order of elements field.">;
 } Annotation;
+
+typedef struct {
+    uint count <comment="Number of elements in the array.">;
+    uint offsets[count] <comment="Array of offsets to the parameter annotations. Each offset must refers to an Annotation. The array has count elements.">;
+} AnnotationArray;
+
+typedef struct {
+    uint count <comment="Number of parameters the method has. This number includes synthetic and mandated parameters.">;
+    AnnotationArray annotations[count] <comment="Array of annotation lists for each parameter. The array has count elements and each element is in AnnotationArray format.">;
+} ParamAnnotations;
 
 typedef struct {
     uleb128 line_start <comment="The initial value of line register of the state machine.">;
@@ -227,6 +238,34 @@ void readCodeAt(uint offset) {
     }
 }
 
+void readAnnotationAt(uint offset) {
+    local int64 pos;
+    local int color;
+    if (offset != 0) {
+        color = GetBackColor();
+        pos = FTell();
+        FSeek(offset);
+        SetBackColor(0xf09020);
+        Annotation annotation_data;
+        FSeek(pos);
+        SetBackColor(color);
+    }
+}
+
+void readParamAnnotationsAt(uint offset) {
+    local int64 pos;
+    local int color;
+    if (offset != 0) {
+        color = GetBackColor();
+        pos = FTell();
+        FSeek(offset);
+        SetBackColor(0xf09020);
+        ParamAnnotations annotation_data;
+        FSeek(pos);
+        SetBackColor(color);
+    }
+}
+
 void readDebugInfoAt(uint offset) {
     local int64 pos;
     local int color;
@@ -235,7 +274,7 @@ void readDebugInfoAt(uint offset) {
         pos = FTell();
         FSeek(offset);
         SetBackColor(0xc0c0c0);
-        DebugInfo debug_info <comment="Debug information contains mapping between program counter of a method and line numbers in source code and information about local variables. The format is derived from DWARF Debugging Information Format, Version 3 (see item 6.2). The mapping and local variable information are encoded in line number program which is interpreted by the state machine. To deduplicate the same line number programs of different methods all constants the program refers to are moved into the constant pool.">;
+        DebugInfo debug_info_data <comment="Debug information contains mapping between program counter of a method and line numbers in source code and information about local variables. The format is derived from DWARF Debugging Information Format, Version 3 (see item 6.2). The mapping and local variable information are encoded in line number program which is interpreted by the state machine. To deduplicate the same line number programs of different methods all constants the program refers to are moved into the constant pool.">;
         FSeek(pos);
         SetBackColor(color);
     }
@@ -255,15 +294,19 @@ typedef struct {
         break;
     case 3:  // RUNTIME_ANNOTATION
         uint runtime_annotation <comment="Offset to runtime visible annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_annotation);
         break;
     case 4:  // ANNOTATION
         uint annotation <comment="Offset to runtime invisible annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(annotation);
         break;
     case 5:  // RUNTIME_TYPE_ANNOTATION
         uchar runtime_type_annotation <comment="Offset to runtime visible type annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_type_annotation);
         break;
     case 6:  // TYPE_ANNOTATION
         uchar type_annotation <comment="Offset to runtime invisible type annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(type_annotation);
         break;
     case 7:  // SOURCE_FILE
         uchar source_file <comment="Offset to a file name string containing source code of this class.">;
@@ -325,15 +368,19 @@ typedef struct (ushort type_idx) {
         break;
     case 3:  // RUNTIME_ANNOTATIONS
         uint runtime_annotations <comment="Offset to runtime visible annotation of the field. The tag may be repeated in case the field has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_annotations);
         break;
     case 4:  // ANNOTATIONS
         uint annotations <comment="Offset to runtime invisible annotation of the field. The tag may be repeated in case the field has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(annotations);
         break;
     case 5:  // RUNTIME_TYPE_ANNOTATION
         uint runtime_type_annotation <comment="Offset to runtime visible type annotation of the field. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_type_annotation);
         break;
     case 6:  // TYPE_ANNOTATION
         uint type_annotation <comment="Offset to runtime invisible type annotation of the field. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(type_annotation);
         break;
     }
 } FieldTag;
@@ -352,9 +399,11 @@ typedef struct {
         break;
     case 3:  // RUNTIME_ANNOTATION
         uint runtime_annotation <comment="Data represents the offset to runtime visible annotation of the method. The tag may be repeated in case the method has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_annotation);
         break;
     case 4:  // RUNTIME_PARAM_ANNOTATION
         uint runtime_param_annotation <comment="Data represents the offset to the runtime visible annotations of the method's parameters. The offset must point to the value in ParamAnnotations format.">;
+        readParamAnnotationAt(runtime_param_annotation);
         break;
     case 5:  // DEBUG_INFO
         uint debug_info <comment="Data represents the offset to debug information related to the method. The offset must point to DebugInfo.">;
@@ -362,15 +411,19 @@ typedef struct {
         break;
     case 6:  // ANNOTATIONS
         uint annotations <comment="Data represents the offset to runtime invisible annotation of the method. The tag may be repeated in case the method has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(annotations);
         break;
     case 7:  // PARAM_ANNOTATION
         uint param_annotation <comment="Data represents the offset to the runtime invisible annotations of the method's parameters. The offset must point to the value in ParamAnnotations format.">;
+        readParamAnnotationAt(runtime_param_annotation);
         break;
     case 8:  // TYPE_ANNOTATION
         uint type_annotation <comment="Data represents the offset to runtime invisible type annotation of the method. The tag may be repeated in case the method has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(type_annotation);
         break;
     case 9:  // RUNTIME_TYPE_ANNOTATION
         uint runtime_type_annotation <comment="Data represents the offset to runtime visible type annotation of the method. The tag may be repeated in case the method has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_type_annotation);
         break;
     }
 } MethodTag;
