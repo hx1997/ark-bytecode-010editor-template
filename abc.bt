@@ -282,41 +282,28 @@ uint getFieldTypeByIdx(ushort type_idx) {
 }
 
 void readFieldValue(uint field_type) {
+    // arkcompiler\runtime_core\libpandafile\field_data_accessor.cpp
     if (field_type < 16) {
         switch (field_type) {
             case 0x0:  // u1
             case 0x2:  // u8
-                uchar value <comment="Contains value in the Value format.">;
-                break;
             case 0x1:  // i8
-                char value <comment="Contains value in the Value format.">;
-                break;
             case 0x3:  // i16
-                short value <comment="Contains value in the Value format.">;
-                break;
             case 0x4:  // u16
-                ushort value <comment="Contains value in the Value format.">;
-                break;
             case 0x5:  // i32
-                int value <comment="Contains value in the Value format.">;
-                break;
             case 0x6:  // u32
+            case 0x7:  // f32
+            case 0xb:  // any, not sure if this is right
                 uint value <comment="Contains value in the Value format.">;
                 break;
-            case 0x7:  // f32
-                float value <comment="Contains value in the Value format.">;
-                break;
             case 0x8:  // f64
-                double value <comment="Contains value in the Value format.">;
-                break;
             case 0x9:  // i64
-                int64 value <comment="Contains value in the Value format.">;
-                break;
             case 0xa:  // u64
+                uint offset;
+                uint64 pos = FTell();
+                FSeek(offset);
                 uint64 value <comment="Contains value in the Value format.">;
-                break;
-            case 0xb:  // any
-                // TODO
+                FSeek(pos);
                 break;
         }
     } else {
