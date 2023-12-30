@@ -231,7 +231,7 @@ void readCodeAt(uint offset) {
         color = GetBackColor();
         pos = FTell();
         FSeek(offset);
-        SetBackColor(cLtYellow);
+        SetBackColor(0x00a5ff);
         Code code_data <comment="Code data.">;
         FSeek(pos);
         SetBackColor(color);
@@ -427,6 +427,76 @@ typedef struct {
         break;
     }
 } MethodTag;
+
+string getShortyTypeName(uchar shorty_nibble) {
+    switch (shorty_nibble) {
+        case 0x0:
+            return "end";
+        case 0x1:
+            return "void";
+        case 0x2:
+            return "u1";
+        case 0x3:
+            return "i8";
+        case 0x4:
+            return "u8";
+        case 0x5:
+            return "i16";
+        case 0x6:
+            return "u16";
+        case 0x7:
+            return "i32";
+        case 0x8:
+            return "u32";
+        case 0x9:
+            return "f32";
+        case 0xa:
+            return "f64";
+        case 0xb:
+            return "i64";
+        case 0xc:
+            return "u64";
+        case 0xd:
+            return "ref";
+        case 0xe:
+            return "any";
+    }
+}
+
+uint parseShorty() {
+    BitfieldDisablePadding();
+    BitfieldLeftToRight();
+    local uint num_bits = 4;
+    local uint num_refs = 0;
+    ushort shorty_returntype : 4 <read=getShortyTypeName, comment="Shorty is a short description of method's signature without detailed information about reference types. A shorty begins with a return type followed by method arguments and ends with 0x0.">;
+
+    if (shorty_returntype == 0xd) {
+        num_refs++;
+    }
+
+    ushort shorty_paramlist : 4 <read=getShortyTypeName>;
+    while (shorty_paramlist != 0) {
+        num_bits = (num_bits + 4) % 16;
+        if (shorty_paramlist == 0xd) {
+            num_refs++;
+        }
+
+        ushort shorty_paramlist : 4 <read=getShortyTypeName>;
+    }
+    num_bits = (num_bits + 4) % 16;
+
+    if (num_bits != 0) {
+        // `Shorty` elements appear in groups of 16 bits. Padding is required if tbhe `Shorty` ends when a group hasn't reached 16 bits.
+        local uint padding_size = 16 - num_bits;
+        ushort  : padding_size;
+    }
+    return num_refs;
+}
+
+typedef struct {
+    local uint num_refs = parseShorty();
+    ushort reference_types[num_refs] <optimize=false, comment="Array of indexes of the method's signature non-primitive types. For each non-primitive type in the shorty there is the corresponding element in the array. Size of the array is equals to number of reference types in the shorty.">;
+} Proto;
 
 void readStringAt(uint offset) {
     local int64 pos;
@@ -743,6 +813,15 @@ typedef struct (uint offset, int size) {
     SetBackColor(0xd060d0);
     uint offsets[size] <optimize=false, comment="Array of offsets to Proto structures.">;
     FAlign(4);
+
+    local int i;
+    local uint proto_addr;
+    for (i = 0; i < size; i++) {
+        proto_addr = offsets[i];
+        FSeek(proto_addr);
+        Proto abc_proto_items <optimize=false>;
+    }
+
     FSeek(pos);
 } ProtoRegionIndex;
 
