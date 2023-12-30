@@ -465,7 +465,7 @@ string getShortyTypeName(uchar shorty_nibble) {
 
 uint parseShorty() {
     BitfieldDisablePadding();
-    BitfieldLeftToRight();
+    // Note that the bitfields within each byte are interpreted right-to-left. For example, if you have "0xec 0xce", this is read as 0xc (u64), 0xe (any), 0xe (any), 0xc (u64)
     local uint num_bits = 4;
     local uint num_refs = 0;
     ushort shorty_returntype : 4 <read=getShortyTypeName, comment="Shorty is a short description of method's signature without detailed information about reference types. A shorty begins with a return type followed by method arguments and ends with 0x0.">;
