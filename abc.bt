@@ -486,7 +486,7 @@ uint parseShorty() {
     num_bits = (num_bits + 4) % 16;
 
     if (num_bits != 0) {
-        // `Shorty` elements appear in groups of 16 bits. Padding is required if tbhe `Shorty` ends when a group hasn't reached 16 bits.
+        // `Shorty` elements appear in groups of 16 bits. Padding is required if the `Shorty` ends when a group hasn't reached 16 bits.
         local uint padding_size = 16 - num_bits;
         ushort  : padding_size;
     }
@@ -517,6 +517,10 @@ typedef struct {
     FieldTag field_data(type_idx);
     while (field_data.tag_value != 0) {
         FieldTag field_data(type_idx);
+    }
+
+    if (str.data == "moduleRecordIdx") {
+        modulerecord_literalarrs[class_idx] = field_data[0].value;
     }
 } Field;
 
@@ -720,13 +724,95 @@ uint GetActualNumLiterals(uint num_literals) {
     return actual_num_literals;
 }
 
+int indexof(uint64 arr[], int arrlen, uint64 key) {
+    local int i;
+    for (i = 0; i < arrlen; i++) {
+        if (arr[i] == key) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+typedef struct {
+    uint local_name_offset;
+    readStringAt(local_name_offset);
+    uint import_name_offset;
+    readStringAt(import_name_offset);
+    ushort module_request_idx;
+} RegularImport;
+
+typedef struct {
+    uint local_name_offset;
+    readStringAt(local_name_offset);
+    ushort module_request_idx;
+} NamespaceImport;
+
+
+typedef struct {
+    uint local_name_offset;
+    readStringAt(local_name_offset);
+    uint export_name_offset;
+    readStringAt(export_name_offset);
+} LocalExport;
+
+
+typedef struct {
+    uint export_name_offset;
+    readStringAt(export_name_offset);
+    uint import_name_offset;
+    readStringAt(import_name_offset);
+    ushort module_request_idx;
+} IndirectExport;
+
+
+typedef struct {
+    ushort module_request_idx;
+} StarExport;
+
 typedef struct {
     uint num_literals <comment="num of literals that a literalarray has.">;
-    // Actual number of literals is `num_literals / 2` if no `LiteralTag::ARRAY_*` types are present.
-    // If any of these types is present, the actual number stops at the first occurrence (i.e., no more literals once a `LiteralTag::ARRAY_*` type is encountered), no matter what `num_literals / 2` is.
-    // I don't know why this is so designed, see source code at `arkcompiler\runtime_core\libpandafile\literal_data_accessor-inl.h`
-    local uint actual_num_literals = GetActualNumLiterals(num_literals);
-    Literal literals[actual_num_literals] <optimize=false, comment="Array of literal in one LiteralArray. The array has num_literals elements in Literal format.">;
+
+    local int idx = indexof(modulerecord_literalarrs, abc_header.num_classes, startof(this));
+    if (idx == -1) {
+        // Actual number of literals is `num_literals / 2` if no `LiteralTag::ARRAY_*` types are present.
+        // If any of these types is present, the actual number stops at the first occurrence (i.e., no more literals once a `LiteralTag::ARRAY_*` type is encountered), no matter what `num_literals / 2` is.
+        // I don't know why this is so designed, see source code at `arkcompiler\runtime_core\libpandafile\literal_data_accessor-inl.h`
+        local uint actual_num_literals = GetActualNumLiterals(num_literals);
+        Literal literals[actual_num_literals] <optimize=false, comment="Array of literal in one LiteralArray. The array has num_literals elements in Literal format.">;
+    } else {
+        uint num_module_requests;
+        local int i;
+        for (i = 0; i < num_module_requests; i++) {
+            uint module_requests;
+            readStringAt(module_requests);
+        }
+        
+        uint regular_import_num;
+        for (i = 0; i < regular_import_num; i++) {
+            RegularImport regular_imports;
+        }
+
+        uint namespace_import_num;
+        for (i = 0; i < namespace_import_num; i++) {
+            NamespaceImport namespace_imports;
+        }
+
+        uint local_export_num;
+        for (i = 0; i < local_export_num; i++) {
+            LocalExport local_exports;
+        }
+
+        uint indirect_export_num;
+        for (i = 0; i < indirect_export_num; i++) {
+            IndirectExport indirect_exports;
+        }
+
+        uint starExportNum;
+        for (i = 0; i < starExportNum; i++) {
+            StarExport star_exports;
+        }
+    }
 } LiteralArray;
 
 typedef struct {
@@ -908,6 +994,8 @@ Header abc_header <comment="ABC file header">;
 FSeek(abc_header.index_section_off);
 SetBackColor(0xa030a0);
 RegionIndex abc_region_idxs(abc_header.num_index_regions) <comment="RegionIndex structure is aimed to allow runtime to find index structure that covers specified offset in the file. It is organized as an array of RegionHeader structures. All regions are sorted by the start offset of the region. Number of elements in the index is num_index_regions from Header.">;
+
+local uint64 modulerecord_literalarrs[abc_header.num_classes];  // Keep track of module record offsets when we parse Field.
 
 FSeek(abc_header.class_idx_off);
 SetBackColor(cDkBlue);
