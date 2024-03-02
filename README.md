@@ -19,3 +19,4 @@ For a disassembler, see [https://gitee.com/openharmony/arkcompiler_runtime_core/
 - `arkcompiler\ets_runtime\ecmascript\jspandafile\js_pandafile.cpp`
 - FieldTag: `arkcompiler\runtime_core\libpandafile\field_data_accessor.cpp`
 - LiteralTag: `arkcompiler\runtime_core\libpandafile\literal_data_accessor-inl.h`
+- [Official ABC static defect scanner](https://gitee.com/openharmony/arkcompiler_runtime_core/tree/master/libark_defect_scan_aux)
