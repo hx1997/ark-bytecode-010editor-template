@@ -1,12 +1,13 @@
 //------------------------------------------------
 //--- 010 Editor v12.0.1 Binary Template
 //
-//      File: abc.bt
+//      File: abc12.bt
 //   Authors: hx1997
-//   Version: 1.0
+//   Version: 1.1
 //   Purpose: 010Editor template for .abc (Open/HarmonyOS Ark Bytecode) files
 //   Category: Operating Systems
 //   History: 
+//   1.1   2024-07-27 hx1997: Add support for abc version >=12.0.1.0. For older versions see https://github.com/hx1997/ark-bytecode-010editor-template
 //   1.0   2024-06-21 hx1997: Initial release on Script Repository
 //------------------------------------------------
 
@@ -864,12 +865,12 @@ typedef struct (uint offset, int size) {
 
     //local int i;
     //local uint foreign_start = abc_header.foreign_off;
-    //local uint foreign_end = foreign_start + abc_header.foreign_size - 1;
+    //local uint foreign_end = foreign_start + abc_header.foreign_size;
     //local uint method_addr;
     //for (i = 0; i < size; i++) {
     //    method_addr = offsets[i];
     //    FSeek(method_addr);
-    //    if (foreign_start <= method_addr && method_addr <= foreign_end)
+    //    if (foreign_start <= method_addr && method_addr < foreign_end)
     //        ForeignMethod abc_method_items <optimize=false>;
     //    else
     //        Method abc_method_items <optimize=false>;
@@ -887,12 +888,12 @@ typedef struct (uint offset, int size) {
 
     local int i;
     local uint foreign_start = abc_header.foreign_off;
-    local uint foreign_end = foreign_start + abc_header.foreign_size - 1;
+    local uint foreign_end = foreign_start + abc_header.foreign_size;
     local uint field_addr;
     for (i = 0; i < size; i++) {
         field_addr = offsets[i];
         FSeek(field_addr);
-        if (foreign_start <= field_addr && field_addr <= foreign_end)
+        if (foreign_start <= field_addr && field_addr < foreign_end)
             ForeignField abc_field_items <optimize=false>;
         else
             Field abc_field_items <optimize=false>;
@@ -943,12 +944,12 @@ typedef struct (int size) {
     SetBackColor(cLtBlue);
     local int i;
     local uint foreign_start = abc_header.foreign_off;
-    local uint foreign_end = foreign_start + abc_header.foreign_size - 1;
+    local uint foreign_end = foreign_start + abc_header.foreign_size;
     local uint class_addr;
     for (i = 0; i < size; i++) {
         class_addr = class_def[i];
         FSeek(class_addr);
-        if (foreign_start <= class_addr && class_addr <= foreign_end)
+        if (foreign_start <= class_addr && class_addr < foreign_end)
             ForeignClass abc_class_items <optimize=false>;
         else
             class_item abc_class_items <optimize=false>;
