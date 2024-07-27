@@ -20,3 +20,6 @@ For a disassembler, see [https://gitee.com/openharmony/arkcompiler_runtime_core/
 - FieldTag: `arkcompiler\runtime_core\libpandafile\field_data_accessor.cpp`
 - LiteralTag: `arkcompiler\runtime_core\libpandafile\literal_data_accessor-inl.h`
 - [Official ABC static defect scanner](https://gitee.com/openharmony/arkcompiler_runtime_core/tree/master/libark_defect_scan_aux)
+
+# Changelog
+- 2024/7/27: Added support for abc version >= 12.0.1.0
