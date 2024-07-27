@@ -1,8 +1,13 @@
 //------------------------------------------------
 //--- 010 Editor v12.0.1 Binary Template
 //
-//      File: abc
+//      File: abc.bt
 //   Authors: hx1997
+//   Version: 1.0
+//   Purpose: 010Editor template for .abc (Open/HarmonyOS Ark Bytecode) files
+//   Category: Operating Systems
+//   History: 
+//   1.0   2024-06-21 hx1997: Initial release on Script Repository
 //------------------------------------------------
 
 uint Align( uint value, uint alignment )
@@ -577,6 +582,9 @@ typedef struct {
             float value;
             break;
         case 0x5:   // LiteralTag::STRING
+            uint value;
+            readStringAt(value);
+            break;
         case 0x6:   // LiteralTag::METHOD
         case 0x7:   // LiteralTag::GENERATORMETHOD
         case 0x18:  // LiteralTag::LITERALARRAY
@@ -919,13 +927,13 @@ typedef struct {
     ClassRegionIndex class_idx(class_idx_off, class_idx_size) <comment="The structure is organized as an array of FieldType. Number of elements in the index is class_idx_size from RegionHeader.">;
     uint method_idx_size <comment="Number of elements in the MethodRegionIndex structure. Max value is 65536.">;
     uint method_idx_off <comment="Offset to the method index structure. The offset must point to a structure in MethodRegionIndex format.">;
-    MethodRegionIndex method_idx(method_idx_off, method_idx_size) <comment="The structure is organized as an array of offsets from the beginning og the file to the Method or the ForeignMethod structure. Number of elements in the index is method_idx_size from RegionHeader.">;
+    MethodRegionIndex method_idx(method_idx_off, method_idx_size) <comment="The structure is organized as an array of offsets from the beginning of the file to the Method or the ForeignMethod structure. Number of elements in the index is method_idx_size from RegionHeader.">;
     uint field_idx_size <comment="Number of elements in the FieldRegionIndex structure. Max value is 65536.">;
     uint field_idx_off <comment="Offset to the field index structure. The offset must point to a structure in FieldRegionIndex format.">;
-    FieldRegionIndex field_idx(field_idx_off, field_idx_size) <comment="The structure is organized as an array of offsets from the beginning og the file to the Field or the ForeignField structure. Number of elements in the index is field_idx_size from RegionHeader.">;
+    FieldRegionIndex field_idx(field_idx_off, field_idx_size) <comment="The structure is organized as an array of offsets from the beginning of the file to the Field or the ForeignField structure. Number of elements in the index is field_idx_size from RegionHeader.">;
     uint proto_idx_size <comment="Number of elements in the ProtoRegionIndex structure. Max value is 65536.">;
     uint proto_idx_off <comment="Offset to the proto index structure. The offset must point to a structure in ProtoRegionIndex format.">;
-    ProtoRegionIndex proto_idx(proto_idx_off, proto_idx_size) <comment="The structure is organized as an array of offsets from the beginning og the file to the Proto structure. Number of elements in the index is proto_idx_size from RegionHeader.">;
+    ProtoRegionIndex proto_idx(proto_idx_off, proto_idx_size) <comment="The structure is organized as an array of offsets from the beginning of the file to the Proto structure. Number of elements in the index is proto_idx_size from RegionHeader.">;
     FAlign(4);
 } RegionHeader;
 

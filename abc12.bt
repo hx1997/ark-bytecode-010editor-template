@@ -1,0 +1,1016 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: abc.bt
+//   Authors: hx1997
+//   Version: 1.0
+//   Purpose: 010Editor template for .abc (Open/HarmonyOS Ark Bytecode) files
+//   Category: Operating Systems
+//   History: 
+//   1.0   2024-06-21 hx1997: Initial release on Script Repository
+//------------------------------------------------
+
+uint Align( uint value, uint alignment )
+{
+  return (value + (alignment - 1)) & ~(alignment - 1);
+}
+
+void FAlign( uint alignment )
+{
+  FSeek( Align( FTell(), alignment ) );
+}
+
+typedef struct {
+    ubyte val <comment="uleb128 element">;
+    if(val > 0x7f) {
+        ubyte val <comment="uleb128 element">;
+        if (val > 0x7f) {
+            ubyte val <comment="uleb128 element">;
+            if(val > 0x7f) {
+                ubyte val <comment="uleb128 element">;
+                if(val > 0x7f) {
+                    ubyte val <comment="uleb128 element">;
+                }
+            }
+        }
+    }
+} uleb128 <read=ULeb128Read, comment="Unsigned little-endian base 128 value">;
+
+// get the actual uint value of the uleb128
+uint uleb128_value(uleb128 &u) {
+    local uint result;
+    local ubyte cur;
+
+    result = u.val[0];
+    if(result > 0x7f) {
+        cur = u.val[1];
+        result = (result & 0x7f) | (uint)((cur & 0x7f) << 7);
+        if(cur > 0x7f) {
+            cur = u.val[2];
+            result |= (uint)(cur & 0x7f) << 14;
+            if(cur > 0x7f) {
+                cur = u.val[3];
+                result |= (uint)(cur & 0x7f) << 21;
+                if(cur > 0x7f) {
+                    cur = u.val[4];
+                    result |= (uint)cur << 28;
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+typedef struct uleb128 uleb128p1;
+
+int uleb128p1_value(uleb128 &u) {
+    return (int)uleb128_value(u) - 1;
+}
+
+string ULeb128Read(uleb128 &u) {
+    local string s;
+    s = SPrintf(s, "0x%X", uleb128_value(u));
+    return s;
+}
+
+// sleb128
+typedef struct {
+    ubyte val <comment="sleb128 element">;
+    if(val > 0x7f) {
+        ubyte val <comment="sleb128 element">;
+        if (val > 0x7f) {
+            ubyte val <comment="sleb128 element">;
+            if(val > 0x7f) {
+                ubyte val <comment="sleb128 element">;
+                if(val > 0x7f) {
+                    ubyte val <comment="sleb128 element">; 
+                }
+            }
+        }
+    }
+} sleb128 <read=SLeb128Read, comment="Signed little-endian base 128 value">;
+
+// get the actual uint value of the uleb128
+int sleb128_value(sleb128 &u) {
+    local int result;
+    local ubyte cur;
+
+    result = u.val[0];
+    if(result <= 0x7f) {
+        result = (result << 25) >> 25;
+    } else {
+        cur = u.val[1];
+        result = (result & 0x7f) | ((uint)(cur & 0x7f) << 7);
+        if(cur <= 0x7f) {
+            result = (result << 18) >> 18;
+        } else {
+            cur = u.val[2];
+            result |= (uint)(cur & 0x7f) << 14;
+            if(cur <= 0x7f) {
+                result = (result << 11) >> 11;
+            } else {
+                cur = u.val[3];
+                result |= (uint)(cur & 0x7f) << 21;
+                if(cur <= 0x7f) {
+                    result = (result << 4) >> 4;
+                } else {
+                    cur = u.val[4];
+                    result |= (uint)cur << 28;
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+string SLeb128Read(sleb128 &u) {
+    local string s;
+    s = SPrintf(s, "%i", sleb128_value(u));
+    return s;
+}
+
+typedef struct {
+    uleb128 utf16_length <comment="len << 1 | is_ascii where len is the length of the string in UTF-16 code units.">;
+    string data <comment="0-terminated character sequence in MUTF-8 encoding.">;
+} String <read=data>;
+
+typedef struct {
+    char panda[5];
+    char padding[3];
+
+    if(Strcmp(panda, "PANDA") || padding[0] != 0 || padding[1] != 0 || padding[2] != 0) {
+        PrintWarning("Invalid ABC file");
+        return -1;
+    }
+} abc_magic <read=AbcMagicRead, size=8>;
+
+string AbcMagicRead(abc_magic &m) {
+    string s;
+    SPrintf(s, "%s\\0\\0\\0", m.panda);
+    return s;
+}
+
+typedef struct {
+    abc_magic magic <comment="Magic string. Must be 'P' 'A' 'N' 'D' 'A' '\\0' '\\0' '\\0'">; 
+    uint checksum <comment="adler32 checksum of the file except magic and checksum fields.">;
+    uchar version[4] <comment="Version of the format.">;
+    uint filesize <comment="Size of the file in bytes.">;
+    uint foreign_off <comment="Offset to the foreign region. The region must contain elements only of types ForeignField, ForeignMethod, or ForeignClass. It is not necessary foreign_off points to the first entity. Runtime should use foreign_off and foreign_size to determine type of an offset.">;
+    uint foreign_size <comment="Size of the foreign region in bytes.">;
+    uint num_classes <comment="Number of classes defined in the file. Also this is the number of elements in the ClassIndex structure.">;
+    uint class_idx_off <comment="Offset to the class index structure. The offset must point to a structure in ClassIndex format.">;
+    uint num_lnps <comment="Number of line number programs in the file. Also this is the number of elements in the LineNumberProgramIndex structure.">;
+    uint lnp_idx_off <comment="Offset to the line number program index structure. The offset must point to a structure in LineNumberProgramIndex format.">;
+    uint num_literalarrays <comment="Number of literalArrays defined in the file. Also this is the number of elements in the LiteralArrayIndex structure.">;
+    uint literalarray_idx_off <comment="Offset to the literalarray index structure. The offset must point to a structure in LiteralArrayIndex format.">;
+    uint num_index_regions <comment="Number of the index regions in the file. Also this is the number of elements in the RegionIndex structure.">;
+    uint index_section_off <comment="Offset to the index section. The offset must point to a structure in RegionIndex format.">;
+    FAlign(4);
+} Header <size=readHeaderItemSize>;
+
+int readHeaderItemSize(Header &item) {
+    return 56;
+}
+
+typedef struct {
+    uleb128 type_idx <comment="Index + 1 of the exception's type the block handles in a ClassRegionIndex structure or 0 in case of catch all block. Corresponding index entry must be an offset to a ForeignClass or to Class. The case when the index is 0 means it is a catch all block which catches all exceptions.">;
+    uleb128 handler_pc <comment="pc of the first instruction of the exception handler.">;
+    uleb128 code_size <comment="Handler's code size in bytes">;
+} CatchBlock;
+
+typedef struct {
+    uleb128 start_pc <comment="Start pc of the try block. This pc points to the first instruction covered by this try block.">;
+    uleb128 length <comment="Number of instructions covered by the try block.">;
+    uleb128 num_catches <comment="Number of catch blocks associated with the try block.">;
+    CatchBlock catch_blocks[uleb128_value(num_catches)] <optimize=false, comment="Array of catch blocks associated with the try block. The array has num_catches elements in CatchBlock format. Catch blocks follows in the order runtime must check the exception's type. The catch all block, if present, must be the last.">;
+} TryBlock;
+
+typedef struct {
+    uleb128 num_vregs <comment="Number of registers (without argument registers).">;
+    uleb128 num_args <comment="Number of arguments.">;
+    uleb128 code_size <comment="Size of instructions in bytes.">;
+    uleb128 tries_size <comment="Number of try blocks.">;
+    uchar instructions[uleb128_value(code_size)] <comment="Instructions.">;
+    TryBlock try_blocks[uleb128_value(tries_size)] <optimize=false, comment="Array of try blocks. The array has tries_size elements in TryBlock format.">;
+} Code;
+
+typedef struct {
+    uint name_off <comment="Offset to the element's name. The offset must point to a String.">;
+    readStringAt(name_off);
+    // size of value is fixed (32-bit), see `arkcompiler\runtime_core\libpandafile\annotation_data_accessor.cpp`
+    uint value <comment="Value of the element. If the annotation element has type boolean, byte, short, char, int or float the field value contains the value itself in the corresponding Value format. Else the field contains offset to a Value. Format of the value could be determined based on element's type.">;
+} AnnotationElement;
+
+typedef struct {
+    ushort class_idx <comment="Index of the declaring class in a ClassRegionIndex structure. Corresponding index entry must be an offset to a Class or a ForeignClass.">;
+    ushort count <comment="Number of name-value pairs in the annotation (number of elements in elements array).">;
+    AnnotationElement elements[count] <comment="Array of annotation elements. Each element is in AnnotationElement format. Order of elements must be the same as they follow in the annotation class.">;
+    uchar element_types[count] <comment="Array of annotation element's types. Each element in the array describes the type of AnnotationElement. The order of elements in the array matches the order of elements field.">;
+} Annotation;
+
+typedef struct {
+    uint count <comment="Number of elements in the array.">;
+    uint offsets[count] <comment="Array of offsets to the parameter annotations. Each offset must refers to an Annotation. The array has count elements.">;
+} AnnotationArray;
+
+typedef struct {
+    uint count <comment="Number of parameters the method has. This number includes synthetic and mandated parameters.">;
+    AnnotationArray annotations[count] <comment="Array of annotation lists for each parameter. The array has count elements and each element is in AnnotationArray format.">;
+} ParamAnnotations;
+
+typedef struct {
+    uleb128 line_start <comment="The initial value of line register of the state machine.">;
+    uleb128 num_parameters <comment="Number of method parameters.">;
+    uleb128 parameters[uleb128_value(num_parameters)] <optimize=false, comment="Parameters names of the method. The array has num_parameters elements. Each element is an offset to String or 0 if there is no name.">;
+    uleb128 constant_pool_size <comment="Size of constant pool in bytes.">;
+    uchar constant_pool[uleb128_value(constant_pool_size)] <comment="Constant pool data of length constant_pool_size bytes.">;
+    uleb128 line_number_program_idx <comment=" 	Line number program index in a LineNumberProgramIndex structure. The program has variable length and ends with DBG_END_SEQUENCE opcode.">;
+} DebugInfo;
+
+void readCodeAt(uint offset) {
+    local int64 pos;
+    local int color;
+    if (offset != 0) {
+        color = GetBackColor();
+        pos = FTell();
+        FSeek(offset);
+        SetBackColor(0x00a5ff);
+        Code code_data <comment="Code data.">;
+        FSeek(pos);
+        SetBackColor(color);
+    }
+}
+
+void readAnnotationAt(uint offset) {
+    local int64 pos;
+    local int color;
+    if (offset != 0) {
+        color = GetBackColor();
+        pos = FTell();
+        FSeek(offset);
+        SetBackColor(0xf09020);
+        Annotation annotation_data;
+        FSeek(pos);
+        SetBackColor(color);
+    }
+}
+
+void readParamAnnotationsAt(uint offset) {
+    local int64 pos;
+    local int color;
+    if (offset != 0) {
+        color = GetBackColor();
+        pos = FTell();
+        FSeek(offset);
+        SetBackColor(0xf09020);
+        ParamAnnotations annotation_data;
+        FSeek(pos);
+        SetBackColor(color);
+    }
+}
+
+void readDebugInfoAt(uint offset) {
+    local int64 pos;
+    local int color;
+    if (offset != 0) {
+        color = GetBackColor();
+        pos = FTell();
+        FSeek(offset);
+        SetBackColor(0xc0c0c0);
+        DebugInfo debug_info_data <comment="Debug information contains mapping between program counter of a method and line numbers in source code and information about local variables. The format is derived from DWARF Debugging Information Format, Version 3 (see item 6.2). The mapping and local variable information are encoded in line number program which is interpreted by the state machine. To deduplicate the same line number programs of different methods all constants the program refers to are moved into the constant pool.">;
+        FSeek(pos);
+        SetBackColor(color);
+    }
+}
+
+typedef struct {
+    uchar tag_value <comment="The first 8 bits contain tag which determines the meaning of the data. Depending on the tag there may be optional data. Runtime must be able to determine size of the data.">;
+    switch (tag_value) {
+    case 0:  // NOTHING
+        break;
+    case 1:  // INTERFACES
+        uleb128 num_interfaces <comment="Number of interfaces.">;
+        ushort interfaces_idx[uleb128_value(num_interfaces)] <comment="Indexes of the interfaces in a ClassRegionIndex structure. Each index is 2 bytes long and must be resolved to offset point to a ForeignClass or to a Class.">;
+        break;
+    case 2:  // SOURCE_LANG
+        uchar source_lang <comment="Data represents the source language.">;
+        break;
+    case 3:  // RUNTIME_ANNOTATION
+        uint runtime_annotation <comment="Offset to runtime visible annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_annotation);
+        break;
+    case 4:  // ANNOTATION
+        uint annotation <comment="Offset to runtime invisible annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(annotation);
+        break;
+    case 5:  // RUNTIME_TYPE_ANNOTATION
+        uchar runtime_type_annotation <comment="Offset to runtime visible type annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_type_annotation);
+        break;
+    case 6:  // TYPE_ANNOTATION
+        uchar type_annotation <comment="Offset to runtime invisible type annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(type_annotation);
+        break;
+    case 7:  // SOURCE_FILE
+        uchar source_file <comment="Offset to a file name string containing source code of this class.">;
+        break;
+    }
+} ClassTag;
+
+uint getFieldTypeByIdx(ushort type_idx) {
+    local int i;
+    local uint64 pos = FTell();
+    for (i = 0; i < abc_header.num_index_regions; i++) {
+        if (pos < abc_region_idxs.region_headers[i].start_off || pos > abc_region_idxs.region_headers[i].end_off)
+            continue;
+        return abc_region_idxs.region_headers[i].class_idx.types[type_idx].field_type;
+    }
+}
+
+void readFieldValue(uint field_type) {
+    // arkcompiler\runtime_core\libpandafile\field_data_accessor.cpp
+    if (field_type < 16) {
+        switch (field_type) {
+            case 0x0:  // u1
+            case 0x2:  // u8
+            case 0x1:  // i8
+            case 0x3:  // i16
+            case 0x4:  // u16
+            case 0x5:  // i32
+            case 0x6:  // u32
+            case 0x7:  // f32
+            case 0xb:  // any, not sure if this is right
+                uint value <comment="Contains value in the Value format.">;
+                break;
+            case 0x8:  // f64
+            case 0x9:  // i64
+            case 0xa:  // u64
+                uint offset;
+                uint64 pos = FTell();
+                FSeek(offset);
+                uint64 value <comment="Contains value in the Value format.">;
+                FSeek(pos);
+                break;
+        }
+    } else {
+        uint value <comment="Contains value in the Value format.">;
+    }
+}
+
+typedef struct (ushort type_idx) {
+    uchar tag_value <comment="The first 8 bits contain tag which determines the meaning of the data. Depending on the tag there may be optional data. Runtime must be able to determine size of the data.">;
+    switch (tag_value) {
+    case 0:  // NOTHING
+        break;
+    case 1:  // INT_VALUE
+        sleb128 int_value <comment="Integral value of the field. This tag is used when the field has type boolean, byte, char, short or int.">;
+        break;
+    case 2:  // VALUE
+        local uint field_type = getFieldTypeByIdx(type_idx);
+        readFieldValue(field_type);
+        break;
+    case 3:  // RUNTIME_ANNOTATIONS
+        uint runtime_annotations <comment="Offset to runtime visible annotation of the field. The tag may be repeated in case the field has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_annotations);
+        break;
+    case 4:  // ANNOTATIONS
+        uint annotations <comment="Offset to runtime invisible annotation of the field. The tag may be repeated in case the field has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(annotations);
+        break;
+    case 5:  // RUNTIME_TYPE_ANNOTATION
+        uint runtime_type_annotation <comment="Offset to runtime visible type annotation of the field. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_type_annotation);
+        break;
+    case 6:  // TYPE_ANNOTATION
+        uint type_annotation <comment="Offset to runtime invisible type annotation of the field. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(type_annotation);
+        break;
+    }
+} FieldTag;
+
+typedef struct {
+    uchar tag_value <comment="The first 8 bits contain tag which determines the meaning of the data. Depending on the tag there may be optional data. Runtime must be able to determine size of the data.">;
+    switch (tag_value) {
+    case 0:  // NOTHING
+        break;
+    case 1:  // CODE
+        uint code <comment="Data represents the offset to method's code. The offset must point to Code.">;
+        readCodeAt(code);
+        break;
+    case 2:  // SOURCE_LANG
+        uchar source_lang <comment="Data represents the source language.">;
+        break;
+    case 3:  // RUNTIME_ANNOTATION
+        uint runtime_annotation <comment="Data represents the offset to runtime visible annotation of the method. The tag may be repeated in case the method has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_annotation);
+        break;
+    case 4:  // RUNTIME_PARAM_ANNOTATION
+        uint runtime_param_annotation <comment="Data represents the offset to the runtime visible annotations of the method's parameters. The offset must point to the value in ParamAnnotations format.">;
+        readParamAnnotationAt(runtime_param_annotation);
+        break;
+    case 5:  // DEBUG_INFO
+        uint debug_info <comment="Data represents the offset to debug information related to the method. The offset must point to DebugInfo.">;
+        readDebugInfoAt(debug_info);
+        break;
+    case 6:  // ANNOTATIONS
+        uint annotations <comment="Data represents the offset to runtime invisible annotation of the method. The tag may be repeated in case the method has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(annotations);
+        break;
+    case 7:  // PARAM_ANNOTATION
+        uint param_annotation <comment="Data represents the offset to the runtime invisible annotations of the method's parameters. The offset must point to the value in ParamAnnotations format.">;
+        readParamAnnotationAt(runtime_param_annotation);
+        break;
+    case 8:  // TYPE_ANNOTATION
+        uint type_annotation <comment="Data represents the offset to runtime invisible type annotation of the method. The tag may be repeated in case the method has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(type_annotation);
+        break;
+    case 9:  // RUNTIME_TYPE_ANNOTATION
+        uint runtime_type_annotation <comment="Data represents the offset to runtime visible type annotation of the method. The tag may be repeated in case the method has several annotations. The offset must point to the value in Annotation format.">;
+        readAnnotationAt(runtime_type_annotation);
+        break;
+    }
+} MethodTag;
+
+string getShortyTypeName(uchar shorty_nibble) {
+    switch (shorty_nibble) {
+        case 0x0:
+            return "end";
+        case 0x1:
+            return "void";
+        case 0x2:
+            return "u1";
+        case 0x3:
+            return "i8";
+        case 0x4:
+            return "u8";
+        case 0x5:
+            return "i16";
+        case 0x6:
+            return "u16";
+        case 0x7:
+            return "i32";
+        case 0x8:
+            return "u32";
+        case 0x9:
+            return "f32";
+        case 0xa:
+            return "f64";
+        case 0xb:
+            return "i64";
+        case 0xc:
+            return "u64";
+        case 0xd:
+            return "ref";
+        case 0xe:
+            return "any";
+    }
+}
+
+uint parseShorty() {
+    BitfieldDisablePadding();
+    // Note that the bitfields within each byte are interpreted right-to-left. For example, if you have "0xec 0xce", this is read as 0xc (u64), 0xe (any), 0xe (any), 0xc (u64)
+    local uint num_bits = 4;
+    local uint num_refs = 0;
+    ushort shorty_returntype : 4 <read=getShortyTypeName, comment="Shorty is a short description of method's signature without detailed information about reference types. A shorty begins with a return type followed by method arguments and ends with 0x0.">;
+
+    if (shorty_returntype == 0xd) {
+        num_refs++;
+    }
+
+    ushort shorty_paramlist : 4 <read=getShortyTypeName>;
+    while (shorty_paramlist != 0) {
+        num_bits = (num_bits + 4) % 16;
+        if (shorty_paramlist == 0xd) {
+            num_refs++;
+        }
+
+        ushort shorty_paramlist : 4 <read=getShortyTypeName>;
+    }
+    num_bits = (num_bits + 4) % 16;
+
+    if (num_bits != 0) {
+        // `Shorty` elements appear in groups of 16 bits. Padding is required if the `Shorty` ends when a group hasn't reached 16 bits.
+        local uint padding_size = 16 - num_bits;
+        ushort  : padding_size;
+    }
+    return num_refs;
+}
+
+typedef struct {
+    local uint num_refs = parseShorty();
+    ushort reference_types[num_refs] <optimize=false, comment="Array of indexes of the method's signature non-primitive types. For each non-primitive type in the shorty there is the corresponding element in the array. Size of the array is equals to number of reference types in the shorty.">;
+} Proto;
+
+void readStringAt(uint offset) {
+    local int64 pos;
+    if (offset != 0) {
+        pos = FTell();
+        FSeek(offset);
+        String str <comment="String">;
+        FSeek(pos);
+    }
+}
+
+typedef struct {
+    ushort class_idx <comment="Index of the declaring class in a ClassRegionIndex structure. Corresponding index entry must be an offset to a Class.">;
+    ushort type_idx <comment="Index of the field's type in a ClassRegionIndex structure. Corresponding index entry must be in FieldType format.">;
+    uint name_off <comment="Offset to the name of the field. The offset must point to a String">;
+    readStringAt(name_off);
+    uleb128 access_flags <comment="Access flags of the field. The value must be a combination of the Field access flags.">;
+    FieldTag field_data(type_idx);
+    while (field_data.tag_value != 0) {
+        FieldTag field_data(type_idx);
+    }
+
+    if (str.data == "moduleRecordIdx") {
+        modulerecord_literalarrs[class_idx] = field_data[0].value;
+    }
+} Field;
+
+typedef struct {
+    ushort class_idx <comment="Index of the declaring class in a ClassRegionIndex structure. Corresponding index entry must be an offset to a Class.">;
+    ushort reserved <comment="Reserved.">;
+    uint name_off <comment="Offset to the name of the method. The offset must point to a String.">;
+    readStringAt(name_off);
+    uleb128 access_flags <comment="Access flags of the method. The value must be a combination of Method access flags.">;
+    MethodTag method_data;
+    while (method_data.tag_value != 0) {
+        MethodTag method_data;
+    }
+} Method;
+
+typedef struct {
+    String name <comment="Name of the class. The name must conform to TypeDescriptor syntax.">;
+    uint super_class_off <comment="Offset to the name of the super class or 0 for root object class (panda.Object in Panda Assembly, plugin-specific in plugins). Non-zero offset must point to a ForeignClass or to a Class.">;
+    uleb128 access_flags <comment="Access flags of the class. The value must be a combination of Class access flags.">;
+    uleb128 num_fields <comment="Number of fields the class has.">;
+    uleb128 num_methods <comment="Number of methods the class has.">;
+    ClassTag class_data;
+    while (class_data.tag_value != 0) {
+        ClassTag class_data;
+    }
+    Field fields[uleb128_value(num_fields)] <optimize=false, comment="Class fields. Number of elements is num_fields. Each element must have Field format.">;
+    Method methods[uleb128_value(num_methods)] <optimize=false, comment="Class methods. Number of elements is num_methods. Each element must have Method format.">;
+} class_item;
+
+typedef struct {
+    uchar insns;
+    while (insns != 0) {  // END_SEQUENCE opcode
+        uchar insns;
+    }
+} LineNumberProgram;
+
+typedef struct {
+    uchar tag;
+    switch (tag) {
+        case 0x0:   // shouldn't be here according to source code but... seems to work?
+            uchar value;
+            break;
+        case 0x2:   // LiteralTag::INTEGER
+        case 0x17:  // LiteralTag::LITERALBUFFERINDEX
+            uint value;
+            break;
+        case 0x4:   // LiteralTag::DOUBLE
+            double value;
+            break;
+        case 0x1:   // LiteralTag::BOOL
+            uchar value;
+            break;
+        case 0x3:   // LiteralTag::FLOAT
+            float value;
+            break;
+        case 0x5:   // LiteralTag::STRING
+            uint value;
+            readStringAt(value);
+            break;
+        case 0x6:   // LiteralTag::METHOD
+        case 0x7:   // LiteralTag::GENERATORMETHOD
+        case 0x18:  // LiteralTag::LITERALARRAY
+        case 0x16:  // LiteralTag::ASYNCGENERATORMETHOD
+            uint value;
+            break;
+        case 0x9:   // LiteralTag::METHODAFFILIATE
+            ushort value;
+            break;
+        case 0x19:  // LiteralTag::BUILTINTYPEINDEX
+        case 0x8:   // LiteralTag::ACCESSOR
+        case 0xff:  // LiteralTag::NULLVALUE
+            uchar value;
+            break;
+        case 0xa:   // LiteralTag::ARRAY_U1
+        case 0xb:   // LiteralTag::ARRAY_U8
+            uchar value;
+            break;
+        case 0xc:   // LiteralTag::ARRAY_I8
+            char value;
+            break;
+        case 0xd:   // LiteralTag::ARRAY_U16
+            ushort value;
+            break;
+        case 0xe:   // LiteralTag::ARRAY_I16
+            short value;
+            break;
+        case 0xf:   // LiteralTag::ARRAY_U32
+            uint value;
+            break;
+        case 0x10:  // LiteralTag::ARRAY_I32
+            int value;
+            break;
+        case 0x11:  // LiteralTag::ARRAY_U64
+            uint64 value;
+            break;
+        case 0x12:  // LiteralTag::ARRAY_I64
+            int64 value;
+            break;
+        case 0x13:  // LiteralTag::ARRAY_F32
+            float value;
+            break;
+        case 0x14:  // LiteralTag::ARRAY_F64
+            double value;
+            break;
+        case 0x15:  // LiteralTag::ARRAY_STRING
+            uint value;
+            break;
+    }
+} Literal;
+
+uint GetActualNumLiterals(uint num_literals) {
+    local uint64 pos = FTell();
+
+    local int i;
+    local uint actual_num_literals = 0;
+    local uchar tag;
+    for (i = 0; i < num_literals / 2; i++) {
+        tag = ReadUByte(pos);
+        pos++;
+        switch (tag) {
+            case 0x0:   // shouldn't be here according to source code but... seems to work?
+                pos += 1;
+                actual_num_literals++;
+                break;
+            case 0x2:   // LiteralTag::INTEGER
+            case 0x17:  // LiteralTag::LITERALBUFFERINDEX
+                pos += 4;
+                actual_num_literals++;
+                break;
+            case 0x4:   // LiteralTag::DOUBLE
+                pos += 8;
+                actual_num_literals++;
+                break;
+            case 0x1:   // LiteralTag::BOOL
+                pos += 1;
+                actual_num_literals++;
+                break;
+            case 0x3:   // LiteralTag::FLOAT
+                pos += 4;
+                actual_num_literals++;
+                break;
+            case 0x5:   // LiteralTag::STRING
+            case 0x6:   // LiteralTag::METHOD
+            case 0x7:   // LiteralTag::GENERATORMETHOD
+            case 0x18:  // LiteralTag::LITERALARRAY
+            case 0x16:  // LiteralTag::ASYNCGENERATORMETHOD
+                pos += 4;
+                actual_num_literals++;
+                break;
+            case 0x9:   // LiteralTag::METHODAFFILIATE
+                pos += 2;
+                actual_num_literals++;
+                break;
+            case 0x19:  // LiteralTag::BUILTINTYPEINDEX
+            case 0x8:   // LiteralTag::ACCESSOR
+            case 0xff:  // LiteralTag::NULLVALUE
+                pos += 1;
+                actual_num_literals++;
+                break;
+            case 0xa:   // LiteralTag::ARRAY_U1
+            case 0xb:   // LiteralTag::ARRAY_U8
+            case 0xc:   // LiteralTag::ARRAY_I8
+                pos += 1;
+                actual_num_literals++;
+                i = num_literals / 2;
+                break;
+            case 0xd:   // LiteralTag::ARRAY_U16
+            case 0xe:   // LiteralTag::ARRAY_I16
+                pos += 2;
+                actual_num_literals++;
+                i = num_literals / 2;
+                break;
+            case 0xf:   // LiteralTag::ARRAY_U32
+            case 0x10:  // LiteralTag::ARRAY_I32
+                pos += 4;
+                actual_num_literals++;
+                i = num_literals / 2;
+                break;
+            case 0x11:  // LiteralTag::ARRAY_U64
+            case 0x12:  // LiteralTag::ARRAY_I64
+                pos += 8;
+                actual_num_literals++;
+                i = num_literals / 2;
+                break;
+            case 0x13:  // LiteralTag::ARRAY_F32
+                pos += 4;
+                actual_num_literals++;
+                i = num_literals / 2;
+                break;
+            case 0x14:  // LiteralTag::ARRAY_F64
+                pos += 8;
+                actual_num_literals++;
+                i = num_literals / 2;
+                break;
+            case 0x15:  // LiteralTag::ARRAY_STRING
+                actual_num_literals++;
+                i = num_literals / 2;
+                break;
+            default:    // invalid tag
+                i = num_literals / 2;
+                break;
+        }
+    }
+    return actual_num_literals;
+}
+
+int indexof(uint64 arr[], int arrlen, uint64 key) {
+    local int i;
+    for (i = 0; i < arrlen; i++) {
+        if (arr[i] == key) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+typedef struct {
+    uint local_name_offset;
+    readStringAt(local_name_offset);
+    uint import_name_offset;
+    readStringAt(import_name_offset);
+    ushort module_request_idx;
+} RegularImport;
+
+typedef struct {
+    uint local_name_offset;
+    readStringAt(local_name_offset);
+    ushort module_request_idx;
+} NamespaceImport;
+
+
+typedef struct {
+    uint local_name_offset;
+    readStringAt(local_name_offset);
+    uint export_name_offset;
+    readStringAt(export_name_offset);
+} LocalExport;
+
+
+typedef struct {
+    uint export_name_offset;
+    readStringAt(export_name_offset);
+    uint import_name_offset;
+    readStringAt(import_name_offset);
+    ushort module_request_idx;
+} IndirectExport;
+
+
+typedef struct {
+    ushort module_request_idx;
+} StarExport;
+
+typedef struct {
+    uint num_literals <comment="num of literals that a literalarray has.">;
+
+    local int idx = indexof(modulerecord_literalarrs, abc_header.num_classes, startof(this));
+    if (idx == -1) {
+        // Actual number of literals is `num_literals / 2` if no `LiteralTag::ARRAY_*` types are present.
+        // If any of these types is present, the actual number stops at the first occurrence (i.e., no more literals once a `LiteralTag::ARRAY_*` type is encountered), no matter what `num_literals / 2` is.
+        // I don't know why this is so designed, see source code at `arkcompiler\runtime_core\libpandafile\literal_data_accessor-inl.h`
+        local uint actual_num_literals = GetActualNumLiterals(num_literals);
+        Literal literals[actual_num_literals] <optimize=false, comment="Array of literal in one LiteralArray. The array has num_literals elements in Literal format.">;
+    } else {
+        uint num_module_requests;
+        local int i;
+        for (i = 0; i < num_module_requests; i++) {
+            uint module_requests;
+            readStringAt(module_requests);
+        }
+        
+        uint regular_import_num;
+        for (i = 0; i < regular_import_num; i++) {
+            RegularImport regular_imports;
+        }
+
+        uint namespace_import_num;
+        for (i = 0; i < namespace_import_num; i++) {
+            NamespaceImport namespace_imports;
+        }
+
+        uint local_export_num;
+        for (i = 0; i < local_export_num; i++) {
+            LocalExport local_exports;
+        }
+
+        uint indirect_export_num;
+        for (i = 0; i < indirect_export_num; i++) {
+            IndirectExport indirect_exports;
+        }
+
+        uint starExportNum;
+        for (i = 0; i < starExportNum; i++) {
+            StarExport star_exports;
+        }
+    }
+} LiteralArray;
+
+typedef struct {
+    uint field_type <comment="Since the first bytes of the file contain the header and size of the header > 16 bytes, any offset in the range [0; sizeof(Header)) is invalid. FieldType encoding uses this fact to encode primitive types of the field in the low 4 bits. For non-primitive type the value is an offset to Class or to ForeignClass. In both cases FieldType is uint32_t.">;
+} FieldType;
+
+typedef struct {
+    String name;
+} ForeignClass;
+
+typedef struct {
+    ushort class_idx <comment="Index of the declaring class in a ClassRegionIndex structure. Corresponding index entry must be an offset to a Class or a ForeignClass.">;
+    ushort type_idx <comment="Index of the field's type in a ClassRegionIndex structure. Corresponding index entry must be in FieldType format.">;
+    uint name_off <comment="Offset to the name of the field. The offset must point to a String">;
+    readStringAt(name_off);
+} ForeignField;
+
+typedef struct {
+    ushort class_idx <comment="Index of the declaring class in a ClassRegionIndex structure. Corresponding index entry must be an offset to a Class or a ForeignClass.">;
+    ushort proto_idx <comment="Index of the method's prototype in a ProtoRegionIndex structure. Corresponding index entry must be an offset to a Proto.">;
+    uint name_off <comment="Offset to the name of the field. The offset must point to a String">;
+    readStringAt(name_off);
+    uleb128 access_flags <comment="Access flags of the method. The value must be a combination of Method access flags. For foreign methods, only ACC_STATIC flag is used, other flags should be ignored.">;
+} ForeignMethod;
+
+typedef struct (uint offset, int size) {
+    local uint64 pos = FTell();
+    FSeek(offset);
+    SetBackColor(0xd060d0);
+    FieldType types[size] <optimize=false, comment="Array of FieldType structures.">;
+    FAlign(4);
+    FSeek(pos);
+} ClassRegionIndex;
+
+typedef struct (uint offset, int size) {
+    local uint64 pos = FTell();
+    FSeek(offset);
+    SetBackColor(0xd060d0);
+    uint offsets[size] <optimize=false, comment="Array of offsets to Method or ForeignMethod structures.">;
+    FAlign(4);
+
+    //local int i;
+    //local uint foreign_start = abc_header.foreign_off;
+    //local uint foreign_end = foreign_start + abc_header.foreign_size - 1;
+    //local uint method_addr;
+    //for (i = 0; i < size; i++) {
+    //    method_addr = offsets[i];
+    //    FSeek(method_addr);
+    //    if (foreign_start <= method_addr && method_addr <= foreign_end)
+    //        ForeignMethod abc_method_items <optimize=false>;
+    //    else
+    //        Method abc_method_items <optimize=false>;
+    //}
+    
+    FSeek(pos);
+} MethodRegionIndex;
+
+typedef struct (uint offset, int size) {
+    local uint64 pos = FTell();
+    FSeek(offset);
+    SetBackColor(0xd060d0);
+    uint offsets[size] <optimize=false, comment="Array of offsets to Field or ForeignField structures.">;
+    FAlign(4);
+
+    local int i;
+    local uint foreign_start = abc_header.foreign_off;
+    local uint foreign_end = foreign_start + abc_header.foreign_size - 1;
+    local uint field_addr;
+    for (i = 0; i < size; i++) {
+        field_addr = offsets[i];
+        FSeek(field_addr);
+        if (foreign_start <= field_addr && field_addr <= foreign_end)
+            ForeignField abc_field_items <optimize=false>;
+        else
+            Field abc_field_items <optimize=false>;
+    }
+
+    FSeek(pos);
+} FieldRegionIndex;
+
+typedef struct (uint offset, int size) {
+    local uint64 pos = FTell();
+    FSeek(offset);
+    SetBackColor(0xd060d0);
+    uint offsets[size] <optimize=false, comment="Array of offsets to Proto structures.">;
+    FAlign(4);
+
+    local int i;
+    local uint proto_addr;
+    for (i = 0; i < size; i++) {
+        proto_addr = offsets[i];
+        FSeek(proto_addr);
+        Proto abc_proto_items <optimize=false>;
+    }
+
+    FSeek(pos);
+} ProtoRegionIndex;
+
+typedef struct {
+    uint start_off <comment="Start offset of the region.">;
+    uint end_off <comment="End offset of the region.">;
+    uint class_idx_size <comment="Number of elements in the ClassRegionIndex structure. Max value is 65536.">;
+    uint class_idx_off <comment="Offset to the class index structure. The offset must point to a structure in ClassRegionIndex format.">;
+    ClassRegionIndex class_idx(class_idx_off, class_idx_size) <comment="The structure is organized as an array of FieldType. Number of elements in the index is class_idx_size from RegionHeader.">;
+    uint method_idx_size <comment="Number of elements in the MethodRegionIndex structure. Max value is 65536.">;
+    uint method_idx_off <comment="Offset to the method index structure. The offset must point to a structure in MethodRegionIndex format.">;
+    MethodRegionIndex method_idx(method_idx_off, method_idx_size) <comment="The structure is organized as an array of offsets from the beginning of the file to the Method or the ForeignMethod structure. Number of elements in the index is method_idx_size from RegionHeader.">;
+    uint reserved1 <comment="Reserved.">;
+    uint reserved2 <comment="Reserved.">;
+    uint reserved3 <comment="Reserved.">;
+    uint reserved4 <comment="Reserved.">;
+    FAlign(4);
+} RegionHeader;
+
+typedef struct (int size) {
+    uint class_def[size] <comment="Class structure offset", optimize=false>;
+    FAlign(4);
+    local uint64 pos = FTell();
+    
+    SetBackColor(cLtBlue);
+    local int i;
+    local uint foreign_start = abc_header.foreign_off;
+    local uint foreign_end = foreign_start + abc_header.foreign_size - 1;
+    local uint class_addr;
+    for (i = 0; i < size; i++) {
+        class_addr = class_def[i];
+        FSeek(class_addr);
+        if (foreign_start <= class_addr && class_addr <= foreign_end)
+            ForeignClass abc_class_items <optimize=false>;
+        else
+            class_item abc_class_items <optimize=false>;
+    }
+    FSeek(pos);
+} ClassIndex;
+
+typedef struct (int size) {
+    uint offsets[size] <comment="Array of offsets to Line Number Program structures.", optimize=false>;
+    FAlign(4);
+    local uint64 pos = FTell();
+    
+    SetBackColor(cLtRed);
+    local uint i;
+    local uint lnp_addr;
+    for (i = 0; i < size; i++) {
+        lnp_addr = offsets[i];
+        FSeek(lnp_addr);
+        LineNumberProgram abc_line_num_programs <optimize=false, comment="A line number program consists of instructions. Each instruction has one byte opcode and optional arguments. Depending on opcode argument's value may be encoded into the instruction or the instruction requires reading the value from constant pool.">;
+    }
+    FSeek(pos);
+} LineNumberProgramIndex;
+
+typedef struct (int size) {
+    uint offsets[size] <comment="Sorted array of offsets to LiteralArray structures.">;
+    FAlign(4);
+    local uint64 pos = FTell();
+
+    SetBackColor(cLtAqua);
+    local uint i;
+    local uint literalarray_addr;
+    for (i = 0; i < size; i++) {
+        literalarray_addr = offsets[i];
+        FSeek(literalarray_addr);
+        LiteralArray abc_literalarrays <optimize=false>;
+    }
+    FSeek(pos);
+} LiteralArrayIndex;
+
+typedef struct (int size) {
+    SetBackColor(0xa030a0);
+    RegionHeader region_headers[size] <optimize=false, comment="To address file structures using 16-bit indexes file is split into regions. Each region has class, method, field and proto indexes and described by RegionHeader structure.">;
+    FAlign(4);
+} RegionIndex;
+
+SetBackColor(cLtGreen);
+Header abc_header <comment="ABC file header">;
+
+FSeek(abc_header.index_section_off);
+SetBackColor(0xa030a0);
+RegionIndex abc_region_idxs(abc_header.num_index_regions) <comment="RegionIndex structure is aimed to allow runtime to find index structure that covers specified offset in the file. It is organized as an array of RegionHeader structures. All regions are sorted by the start offset of the region. Number of elements in the index is num_index_regions from Header.">;
+
+local uint64 modulerecord_literalarrs[abc_header.num_classes];  // Keep track of module record offsets when we parse Field.
+
+FSeek(abc_header.class_idx_off);
+SetBackColor(cDkBlue);
+ClassIndex abc_class_idxs(abc_header.num_classes) <comment="The structure is organized as an array of offsets from the beginning of the file to the Class or ForeignClass structures. All the offsets are sorted by corresponding class names. Number of elements in the index is num_classes from Header.">;
+
+FSeek(abc_header.lnp_idx_off);
+SetBackColor(cDkRed);
+LineNumberProgramIndex abc_line_num_program_idxs(abc_header.num_lnps) <comment="The structure is organized as an array of offsets from the beginning of the file to the Line Number Program structures. Number of elements in the index is num_lnps from Header.">;
+
+FSeek(abc_header.literalarray_idx_off);
+SetBackColor(cDkAqua);
+LiteralArrayIndex abc_literalarray_idxs(abc_header.num_literalarrays) <comment="The structure is organized as an array of offsets from the beginning of the file to the LiteralArray structures. Number of elements in the index is num_literalarrays from Header.">;
