@@ -23,3 +23,4 @@ For a disassembler, see [https://gitee.com/openharmony/arkcompiler_runtime_core/
 
 # Changelog
 - 2024/7/27: Added support for abc version >= 12.0.1.0
+- 2024/9/28: Fixed size of `modulerecord_literalarrs`; better handling of `constant_pool`
