@@ -3,11 +3,12 @@
 //
 //      File: abc12.bt
 //   Authors: hx1997
-//   Version: 1.1
+//   Version: 1.2
 //   Purpose: 010Editor template for .abc (Open/HarmonyOS Ark Bytecode) files
 //   Category: Operating Systems
 //   History: 
-//   1.1   2024-07-27 hx1997: Add support for abc version >=12.0.1.0. For older versions see https://github.com/hx1997/ark-bytecode-010editor-template
+//   1.2   2024-09-28 hx1997: Fix size of modulerecord_literalarrs; better handling of constant_pool (thanks to @alviszh)
+//   1.1   2024-07-27 hx1997: Add support for abc version >=12.0.1.0 (thanks to @hfkai). For older versions see https://github.com/hx1997/ark-bytecode-010editor-template
 //   1.0   2024-06-21 hx1997: Initial release on Script Repository
 //------------------------------------------------
 
@@ -61,6 +62,37 @@ uint uleb128_value(uleb128 &u) {
     }
 
     return result;
+}
+
+// get the number of bytes taken by a uleb128
+uint uleb128_size(uleb128 &u) {
+    local uint result;
+    local ubyte cur;
+    local uint size = 1;
+
+    result = u.val[0];
+    if(result > 0x7f) {
+        size = 2;
+        cur = u.val[1];
+        result = (result & 0x7f) | (uint)((cur & 0x7f) << 7);
+        if(cur > 0x7f) {
+            size = 3;
+            cur = u.val[2];
+            result |= (uint)(cur & 0x7f) << 14;
+            if(cur > 0x7f) {
+                size = 4;
+                cur = u.val[3];
+                result |= (uint)(cur & 0x7f) << 21;
+                if(cur > 0x7f) {
+                    size = 5;
+                    cur = u.val[4];
+                    result |= (uint)cur << 28;
+                }
+            }
+        }
+    }
+
+    return size;
 }
 
 typedef struct uleb128 uleb128p1;
@@ -226,7 +258,13 @@ typedef struct {
     uleb128 num_parameters <comment="Number of method parameters.">;
     uleb128 parameters[uleb128_value(num_parameters)] <optimize=false, comment="Parameters names of the method. The array has num_parameters elements. Each element is an offset to String or 0 if there is no name.">;
     uleb128 constant_pool_size <comment="Size of constant pool in bytes.">;
-    uchar constant_pool[uleb128_value(constant_pool_size)] <comment="Constant pool data of length constant_pool_size bytes.">;
+
+    local uint64 offset = 0;
+    while (offset < uleb128_value(constant_pool_size)) {
+        uleb128 constant_pool <comment="Constant pool data of length constant_pool_size bytes.">;
+        offset += uleb128_size(constant_pool);
+    }
+
     uleb128 line_number_program_idx <comment=" 	Line number program index in a LineNumberProgramIndex structure. The program has variable length and ends with DBG_END_SEQUENCE opcode.">;
 } DebugInfo;
 
