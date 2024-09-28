@@ -820,7 +820,7 @@ typedef struct {
 typedef struct {
     uint num_literals <comment="num of literals that a literalarray has.">;
 
-    local int idx = indexof(modulerecord_literalarrs, abc_header.num_classes, startof(this));
+    local int idx = indexof(modulerecord_literalarrs, abc_region_idxs.region_headers.class_idx_size, startof(this));
     if (idx == -1) {
         // Actual number of literals is `num_literals / 2` if no `LiteralTag::ARRAY_*` types are present.
         // If any of these types is present, the actual number stops at the first occurrence (i.e., no more literals once a `LiteralTag::ARRAY_*` type is encountered), no matter what `num_literals / 2` is.
@@ -1026,7 +1026,7 @@ FSeek(abc_header.index_section_off);
 SetBackColor(0xa030a0);
 RegionIndex abc_region_idxs(abc_header.num_index_regions) <comment="RegionIndex structure is aimed to allow runtime to find index structure that covers specified offset in the file. It is organized as an array of RegionHeader structures. All regions are sorted by the start offset of the region. Number of elements in the index is num_index_regions from Header.">;
 
-local uint64 modulerecord_literalarrs[abc_header.num_classes];  // Keep track of module record offsets when we parse Field.
+local uint64 modulerecord_literalarrs[abc_region_idxs.region_headers.class_idx_size];  // Keep track of module record offsets when we parse Field.
 
 FSeek(abc_header.class_idx_off);
 SetBackColor(cDkBlue);
