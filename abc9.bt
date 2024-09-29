@@ -203,7 +203,7 @@ typedef struct {
 } Header <size=readHeaderItemSize>;
 
 int readHeaderItemSize(Header &item) {
-    return 56;
+    return 60;
 }
 
 typedef struct {
