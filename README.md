@@ -22,5 +22,6 @@ For a disassembler, see [https://gitee.com/openharmony/arkcompiler_runtime_core/
 - [Official ABC static defect scanner](https://gitee.com/openharmony/arkcompiler_runtime_core/tree/master/libark_defect_scan_aux)
 
 # Changelog
-- 2024/7/27: Added support for abc version >= 12.0.1.0
-- 2024/9/28: Fixed size of `modulerecord_literalarrs`; better handling of `constant_pool`
+- 2024/7/27: Added support for abc version >= 12.0.1.0 (thanks to @hfkai)
+- 2024/9/28: Fixed size of `modulerecord_literalarrs`; better handling of `constant_pool` (thanks to @alviszh)
+- 2026/4/19: Fix SOURCE_FILE parsing in ClassTag (thanks to [三六零天御 on 看雪 forum](https://bbs.kanxue.com/thread-290691.htm))

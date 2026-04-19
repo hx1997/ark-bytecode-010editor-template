@@ -3,10 +3,11 @@
 //
 //      File: abc.bt
 //   Authors: hx1997
-//   Version: 1.1
+//   Version: 1.2
 //   Purpose: 010Editor template for .abc (Open/HarmonyOS Ark Bytecode) files
 //   Category: Operating Systems
 //   History: 
+//   1.2   2026-04-19 hx1997: Fix SOURCE_FILE parsing in ClassTag (thanks to 三六零天御 on 看雪 forum)
 //   1.1   2024-09-28 hx1997: Fix size of modulerecord_literalarrs; better handling of constant_pool (thanks to @alviszh)
 //   1.0   2024-06-21 hx1997: Initial release on Script Repository
 //------------------------------------------------
@@ -344,15 +345,15 @@ typedef struct {
         readAnnotationAt(annotation);
         break;
     case 5:  // RUNTIME_TYPE_ANNOTATION
-        uchar runtime_type_annotation <comment="Offset to runtime visible type annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        uint runtime_type_annotation <comment="Offset to runtime visible type annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
         readAnnotationAt(runtime_type_annotation);
         break;
     case 6:  // TYPE_ANNOTATION
-        uchar type_annotation <comment="Offset to runtime invisible type annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
+        uint type_annotation <comment="Offset to runtime invisible type annotation of the class. The tag may be repeated in case the class has several annotations. The offset must point to the value in Annotation format.">;
         readAnnotationAt(type_annotation);
         break;
     case 7:  // SOURCE_FILE
-        uchar source_file <comment="Offset to a file name string containing source code of this class.">;
+        uint source_file <comment="Offset to a file name string containing source code of this class.">;
         break;
     }
 } ClassTag;
